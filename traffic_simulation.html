@@ -28,64 +28,153 @@ rect.motorcycle{
 </style>
 </head>
 <body>
-	<div class="container">
-		<h1>One-Way Traffic Simulation</h1>
-		<div id="simulation"></div>
-		<div>
-			<form class="form-horizontal span12">
-				<h2> Customize </h2>
-				<div >
-						<div class="span3 control-group">
-							<label class="control-label" for="speedlimit">Speed Limit</label>
-							<div class="controls">
-								<input class="span1" type="text" id="speedlimit" value=50>
-							</div>
+	<div class="container-fluid">
+		<div class="row-fluid">
+			<div class="span2" id="legend">
+			</div>
+			<div class="span10">
+				<h1>One-Way Traffic Simulation</h1>
+				<div id="simulation"></div>
+				<div>
+					<form class="form-horizontal span12">
+						<h2> Customize </h2>
+						<div class="row-fluid">
+								<div class="span3 control-group">
+									<label class="control-label" for="speedlimit">Speed Limit</label>
+									<div class="controls">
+										<input class="span6" type="text" id="speedlimit" value=50>
+									</div>
+								</div>
+								<div class="span3 control-group">
+									<label class="control-label" for="vcount">Number of Vehicles</label>
+									<div class="controls">
+										<input class="span6" type="text" id="vcount" value=15>
+									</div>
+								</div>
+								<div class="span3 control-group">
+									<label class="control-label" for="vcount">Number of Lanes</label>
+									<div class="controls">
+										<input class="span6" type="text" id="lanes" value=7>
+									</div>
+								</div>
 						</div>
-						<div class="span3 control-group">
-							<label class="control-label" for="vcount">Number of Vehicles</label>
-							<div class="controls">
-								<input class="span1" type="text" id="vcount" value=15>
+						<div class="row-fluid">
+							<div class="span3 offset1 control-group">
+								<div class="controls">
+									<button id="readform" type="button" class="btn">Try it</button>
+								</div>
 							</div>
-						</div>
+						<div>
+					</form>
 				</div>
-				<div>
-					<div class="control-group">
-						<div class="controls">
-							<button id="readform" type="button" class="btn">Try it</button>
-						</div>
-					</div>
-				<div>
-			</form>
-			<form>
-				<fieldset>
-				</fieldset>
-			</form>
+			</div>
 		</div>
 	</div>
 <script>
 
 	 var params = {}
-	 	paramNames = ["vcount", "speedlimit"]
+	 	paramNames = ["vcount", "speedlimit", "lanes"]
 	 	w = 750
 		h = 200
 		xscale = d3.scale.linear().domain([0,1]).range([15,w-15])
-		lanenumber = 7
 		duration = 50
-		safecarlength = 4
-		safespeedlength = 3
+		safecarlength = 4.5
+		safespeedlength = 4
 		vehicles = new Array()
-		yscalerange = new Array();
+		yscalerange = new Array()
+		running = true
+		isCarSelected = false;
 	var	yscale;
 	var cscale;
 	var mscale;
 	var tscale;
 	
 	var svg = d3.select("#simulation")
- 			.append("svg")
- 			.attr("width", w)
- 			.attr("height", h);
- 
+		.append("svg")
+		.attr("width", w)
+		.attr("height", h);
+ 			
+ 	d3.select("body")
+ 		.append("div")
+ 		.attr("id", "description")
+		.style("position", "absolute")
+		.style("z-index", "10")
+		.style("background", "white")
+		.style("border", "solid 1px #aaa")
+		.style("visibility", "hidden");
+	d3.select("body")
+ 		.append("div")
+ 		.attr("id", "description")
+		.style("position", "absolute")
+		.style("z-index", "10")
+		.style("background", "white")
+		.style("border", "solid 1px #aaa")
+		.style("visibility", "hidden");
+		
+	var description = d3.selectAll("#description")
+						
+	var legend = d3.select("#legend");
+	
+	function createLegend(){	
+		legend.append("div")
+			.attr("class", "row-fluid")
+			.append("h3")
+			.attr("id", "averagespeedhead")
+			.text("Average Speed");
+		legend.select("div")
+				.append("p")
+				.attr("class", "text-warning")
+				.attr("id", "averagespeedtext");
+		legend.select("div")
+				.append("h3")
+				.attr("class", "text-info")
+				.attr("id", "selecthead")
+				.text("Click a car to see its information");
+		legend.select("div")
+				.append("p")
+				.attr("class", "text-info")
+				.attr("id", "selecttext");
+		legend.append("div")
+			.attr("class", "row-fluid")
+			.append("button")
+			.attr("class", "btn btn-primary btn-medium")
+			.text("Pause Simulation")
+			.on("click", pause);
+	}
+ 	createLegend();
  	reset();
+ 	
+ 	
+ 	var timer = setInterval(move, duration)
+ 	
+ 	function pause(){
+ 		if(running){
+ 			running = false;
+ 			clearInterval(timer);
+ 			timer = undefined;
+ 			d3.select(this).text("Resume Simulation");}
+ 		else{
+ 			running = true;
+ 			timer = setInterval(move, duration)
+ 			d3.select(this).text("Pause Simulation");;
+ 		}
+ 	}
+ 	
+ 	function updateLegend(ospeed, cspeed){
+ 		var averagespeed = 0
+ 		svg.selectAll("rect").each(function(d){averagespeed += d.currentspeed;});
+ 		averagespeed = averagespeed / params.vcount * 4;
+ 		legend.select("#averagespeedtext")
+ 			.text("" + averagespeed.toFixed(2));
+ 		if(typeof ospeed !== 'undefined' && typeof cspeed !== 'undefined'){
+			if(!isCarSelected){
+				legend.select("#selecthead")
+					.text("Vehicle Details");
+			}
+			legend.select("#selecttext")
+				.text("Optimal Speed: " + ospeed + "\nCurrent Speed: " + cspeed)
+		}
+ 	}
  
 	function reset(){
 	 	readForm();
@@ -94,12 +183,13 @@ rect.motorcycle{
 		tscale = d3.scale.linear().domain([0,1]).range([params.speedlimit - 8,params.speedlimit + 1]);
 	 	createLanes();
 	 	createVehicles();
-	 	
+	 	updateLegend();
 	 }
 	 
 	 function readForm() {
 	 		params.vcount = parseInt(d3.select("#vcount").property("value"));
 	 		params.speedlimit = parseInt(d3.select("#speedlimit").property("value")) / 4;
+	 		params.lanes = parseInt(d3.select("#lanes").property("value"));
 	 		
 	 		d3.select("#readform").on("click", reset);
 	 		}
@@ -108,9 +198,9 @@ rect.motorcycle{
 	 
 	function createLanes(){
 		yscalerange = new Array();
-		for( var i = 0; i < lanenumber; i++){
-		yscalerange.push(15 + ((i / lanenumber) * (h-15)))}
-		yscale = d3.scale.quantize().domain([0,lanenumber - 1]).range(yscalerange)
+		for( var i = 0; i < params.lanes; i++){
+		yscalerange.push(15 + ((i / params.lanes) * (h-15)))}
+		yscale = d3.scale.quantize().domain([0,params.lanes - 1]).range(yscalerange)
 	}
 	
 	
@@ -134,10 +224,10 @@ rect.motorcycle{
 				speedScale = cscale;
 				width = 20;
 				height = 8;
-				color = "red";
+				color = "purple";
 				stroke = "black";
 				strokewidth = 2;
-				acceleration = 0.5;
+				acceleration = 0.25;
 				break;
 			case 1:
 				type = "truck";
@@ -145,9 +235,9 @@ rect.motorcycle{
 				width = 30;
 				height = 8;
 				color = "black";
-				stroke = "grey";
+				stroke = "black";
 				strokewidth = 2;
-				acceleration = 0.25;
+				acceleration = 0.15;
 				break;
 			case 2:
 				type = "motorcycle";
@@ -157,12 +247,12 @@ rect.motorcycle{
 				color = "blue";
 				stroke = "black";
 				strokewidth = 1;
-				acceleration = 0.75
+				acceleration = 0.35
 				break;
 		}
 		var speed = speedScale(Math.random());
-		var lane = Math.floor(Math.random() * lanenumber)
-		return {"type" : type, "speed": speed, "width": width, 
+		var lane = Math.floor(Math.random() * params.lanes)
+		return {"vtype" : type, "speed": speed, "width": width, 
 				"height": height, "color" : color, "stroke" : stroke, 
 				"stroke-width" : strokewidth, "status" : 0, 
 				"slowspeed" : speed, "lane" : lane, "currentspeed" : speed, "acceleration" : acceleration};
@@ -197,8 +287,26 @@ rect.motorcycle{
 			.style("color", function(d){return d.color})
 			.style("stroke", function(d){return d.stroke})
 			.style("stroke-width", function(d){return d.strokewidth})
-			.attr("fill", function(d){return d.color});
+			.attr("fill", function(d){return d.color})
+			// .on("mouseover", function(d){
+			// 				return description.style("visibility", "visible")
+			// 							.text(function(data,i){
+			// 								if(!i){return "Optimal Speed:" + parseInt(4 * d.speed)}
+			// 								else{ return "Current Speed:" + parseInt(4 * d.currentspeed)}});})
+			// 			.on("mousemove", function(){return description.style("top", function(data,i){return (event.pageY-30 + (20*i))+"px"}).style("left",(event.pageX)+"px");})
+			// 			.on("mouseout", function(){return description.style("visibility", "hidden");})
+			.on("click", function(d){ changeSelected(d.speed, d.currentspeed, d.vtype);});
  	};
+ 	
+ 	function changeSelected(ospeed, cspeed, vtype){
+ 		if(!isCarSelected){
+ 			d3.select("#selecthead")
+ 				.text("Vehicle Attributes");
+			isCarSelected = true;}
+ 		d3.select("#selecttext")
+ 			.text("Vehicle Type: " + vtype + "\nOptimal Speed: " + ospeed + "\nCurrent Speed: " + cspeed);
+ 	}
+ 			
  	
  	
  	function setSpeeds() {
@@ -245,7 +353,7 @@ rect.motorcycle{
 								
 						return parseFloat(xpos) - (safecarlength * selectwidth) - (safespeedlength * selectspeed) <= d3.select(this).attr("x") && d3.select(this).attr("x") <= parseFloat(xpos) + (safecarlength * vwidth) + (safespeedlength*speed);});
 				//if there is space in either of the lanes next to you move to that lane
-				if(upCars.empty() && d.lane + 1 != lanenumber){
+				if(upCars.empty() && d.lane + 1 != params.lanes){
 					d.status = 3;
 					d.slowspeed = d.speed;
 					d.lane += 1
@@ -280,8 +388,17 @@ rect.motorcycle{
  				vehicles[i] = vehicle
  				select.remove()
  				createNewVehicle(vehicle, id);
- 			}}
- 		}}
+ 			}
+ 			if(parseInt(select.attr("lane")) > params.lanes){
+ 				var lane = Math.floor(Math.random() * params.lanes);
+ 				vehicles[i].lane = lane;
+ 				select.attr("lane", lane);
+ 			}
+ 			
+ 			}
+ 		}
+ 		svg.selectAll("rect").filter(function(){return parseInt(d3.select(this).attr("id").substr(1)) > parseInt(params.vcount)}).remove()
+ 		}
  	
  	function move(){
  		setSpeeds();
@@ -289,9 +406,22 @@ rect.motorcycle{
  			.attr("x", function(d){
  				if(d.status == 2 || d.status == 3 ){return parseFloat(d3.select(this).attr("x"))}
  				else{return parseFloat(d3.select(this).attr("x")) + d.currentspeed}})
- 			.attr("y", function(d){return yscale(d3.select(this).attr("lane"))})
+ 			.attr("y", function(){return yscale(d3.select(this).attr("lane"))})
+ 			.attr("fill", function(d){
+ 				if(d.status == 1 || d.status == 2){return "red"}
+ 				else if(d.status == 5){return "yellow"}
+ 				else if(d.status == 4){return "lightgreen"}
+ 				else{return d.color}})
+ 			.style("color", function(d){
+ 				if(d.status == 1 || d.status == 2){return "red"}
+ 				else if(d.status == 5){return "yellow"}
+ 				else if(d.status == 4){return "lightgreen"}
+ 				else{return d.color}})
+ 			.attr("width", function(d){return d.width})
+ 			.attr("height", function(d){return d.height})
  			.duration(duration)
- 			.each("end", deleteVehicles());
+ 			.each("start", updateLegend())
+ 			.each("start", deleteVehicles());
  	}
  	
  	function createNewVehicle(data, id){
@@ -306,10 +436,16 @@ rect.motorcycle{
  			.style("color", function(d){return d.color})
  			.style("stroke", function(d){return d.stroke})
  			.style("stroke-width", function(d){return d.strokewidth})
- 			.attr("fill", function(d){return d.color});
+ 			.attr("fill", function(d){return d.color})
+			// .on("mouseover", function(d){
+			// 				return description.style("visibility", "visible")
+			// 							.text(function(data,i){
+			// 								if(!i){return "Optimal Speed:" + parseInt(4 * d.speed)}
+			// 								else{ return "Current Speed:" + parseInt(4 * d.currentspeed)}});})
+			// 			.on("mousemove", function(){return description.style("top", function(data,i){return (event.pageY-30 + 20*i)+"px"}).style("left",(event.pageX)+"px");})
+			// 			.on("mouseout", function(){return description.style("visibility", "hidden");})
+			.on("click", function(d){changeSelected(d.speed, d.currentspeed);});
  	}
- 	
- 	setInterval(move, duration)
  	
 </script>
 </body>
